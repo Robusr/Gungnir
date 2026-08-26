@@ -1,7 +1,7 @@
 """Tests for the M3 optimizer: deterministic, feasible, at-least-as-good."""
 
 from gungnir.models import GameState, MarketId, ProductId, ProductState
-from gungnir.optimize import objective, optimize
+from gungnir.optimize import objective, optimize, rollout_value
 from gungnir.proposal import propose
 
 
@@ -34,7 +34,7 @@ def test_optimizer_never_worse_than_proposal():
     base = propose(state)
     best = optimize(state)
     _assert_feasible(best)
-    assert objective(best) >= objective(base) - 1e-6
+    assert rollout_value(state, best.decision) >= rollout_value(state, base.decision) - 1e-6
 
 
 def test_optimizer_is_deterministic():
@@ -68,3 +68,17 @@ def test_optimizer_feasible_across_states():
     ]:
         best = optimize(_state(workers=workers, machines=machines, cash=cash, raw_material_units=raw))
         _assert_feasible(best)
+
+
+def test_optimizer_deploys_surplus():
+    best = optimize(_state(cash=10_000_000.0))
+    _assert_feasible(best)
+    assert best.decision.treasury_purchase > 0
+
+
+def test_rollout_value_penalizes_infeasible():
+    state = _state(workers=0, machines=0, cash=0.0, raw_material_units=0.0)
+    best = optimize(state)
+    # Even at zero resources the optimizer returns a feasible (zero-output) plan,
+    # so its rollout value must be finite, not the infeasibility penalty.
+    assert rollout_value(state, best.decision) > -1e11
