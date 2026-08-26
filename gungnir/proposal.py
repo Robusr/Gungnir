@@ -110,6 +110,7 @@ def propose(
         demand=forecast,
         rationale=rationale,
         feasible=feasible,
+        state=state,
     )
 
 
