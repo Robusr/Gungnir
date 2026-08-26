@@ -38,6 +38,8 @@
     .expl { white-space:pre-wrap; font-size:13px; line-height:1.6; }
     #right { display:flex; flex-direction:column; gap:16px; }
     .muted { color:var(--muted); }
+    .grp { margin-bottom: 14px; }
+    .sub { display:block; font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px; }
   </style>
 </head>
 <body>
@@ -48,10 +50,10 @@
 <main>
   <section id="left">
     <h2>① 状态录入</h2>
-    <textarea id="state-json"></textarea>
+    <div id="state-form"></div>
     <div class="row">
       <button onclick="loadExample()" class="secondary">载入示例</button>
-      <button onclick="parseState()">解析状态</button>
+      <button onclick="collectState()">读取表单</button>
     </div>
     <h2>② 操作</h2>
     <div class="row">
@@ -106,18 +108,118 @@
   let currentDecision = null;
   let currentResult = null;
 
-  function loadExample() {
-    $('state-json').value = JSON.stringify(exampleState(), null, 2);
-    $('status').textContent = '已载入示例状态，点击「解析状态」。';
+  // ---- 状态录入表单 (①) -------------------------------------------------
+  const STATE_FIELDS = [
+    { title: '资金与负债', fields: [
+      { p:'period', label:'期号', num:'int' },
+      { p:'cash', label:'现金（元）', num:'float' },
+      { p:'treasury', label:'国债（元）', num:'float' },
+      { p:'bank_loan', label:'银行贷款（元）', num:'float' },
+      { p:'emergency_loan', label:'紧急贷款（元）', num:'float' },
+      { p:'bond_outstanding', label:'债券余额（元）', num:'float' },
+      { p:'bond_principal_due', label:'应还本金（元）', num:'float' },
+      { p:'net_assets', label:'净资产（元）', num:'float' },
+      { p:'tax_credit', label:'税负抵扣（元）', num:'float' },
+    ]},
+    { title: '生产资源', fields: [
+      { p:'workers', label:'工人（人）', num:'int' },
+      { p:'machines', label:'机器（台）', num:'int' },
+      { p:'machines_in_transit', label:'在途机器（台）', num:'int' },
+      { p:'machines_ordered', label:'已订机器（台）', num:'int' },
+      { p:'raw_material_units', label:'原材料（单位）', num:'float' },
+      { p:'accumulated_depreciation', label:'累计折旧（元）', num:'float' },
+    ]},
+    { title: '财务历史（评分）', fields: [
+      { p:'cumulative_tax', label:'累计缴税（元）', num:'float' },
+      { p:'cumulative_dividend', label:'累计分红（元）', num:'float' },
+      { p:'last_period_profit', label:'上期利润（元）', num:'float' },
+      { p:'composite_score', label:'上期综合得分', num:'float' },
+    ]},
+  ];
+
+  const PRODUCT_FIELDS = [
+    { p:'factory_inventory', label:'工厂库存（件）', num:'int' },
+    { p:'market_inventory.M1', label:'市场库存M1（件）', num:'int' },
+    { p:'market_inventory.M2', label:'市场库存M2（件）', num:'int' },
+    { p:'market_inventory.M3', label:'市场库存M3（件）', num:'int' },
+    { p:'backorders.M1', label:'订货M1（件）', num:'int' },
+    { p:'backorders.M2', label:'订货M2（件）', num:'int' },
+    { p:'backorders.M3', label:'订货M3（件）', num:'int' },
+    { p:'rnd_level', label:'研发等级', num:'int' },
+    { p:'rnd_cumulative', label:'累积研发（元）', num:'float' },
+    { p:'rnd_spent_last_period', label:'上期研发（元）', num:'float' },
+    { p:'grade', label:'产品等级', num:'float' },
+  ];
+
+  const PRICE_FIELDS = [
+    { p:'last_period_prices.A.M1', label:'A/M1', num:'float' },
+    { p:'last_period_prices.A.M2', label:'A/M2', num:'float' },
+    { p:'last_period_prices.A.M3', label:'A/M3', num:'float' },
+    { p:'last_period_prices.B.M1', label:'B/M1', num:'float' },
+    { p:'last_period_prices.B.M2', label:'B/M2', num:'float' },
+    { p:'last_period_prices.B.M3', label:'B/M3', num:'float' },
+  ];
+
+  function allStateFields() {
+    const fields = [];
+    for (const g of STATE_FIELDS) for (const f of g.fields) fields.push({ ...f, group: g.title });
+    for (const pid of PRODUCTS)
+      for (const f of PRODUCT_FIELDS)
+        fields.push({ ...f, group: '产品 ' + pid, p: 'products.' + pid + '.' + f.p });
+    for (const f of PRICE_FIELDS) fields.push({ ...f, group: '上期末价格（元）' });
+    return fields;
   }
 
-  function parseState() {
-    try {
-      currentState = JSON.parse($('state-json').value);
-      $('status').textContent = '状态已解析（期初现金 ' + currentState.cash + ' 元）。';
-    } catch (e) {
-      $('status').textContent = 'JSON 解析失败：' + e.message;
+  function getPath(obj, path) {
+    return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  }
+  function setPath(obj, path, val) {
+    const keys = path.split('.');
+    let cur = obj;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const k = keys[i];
+      if (cur[k] == null || typeof cur[k] !== 'object') cur[k] = {};
+      cur = cur[k];
     }
+    cur[keys[keys.length - 1]] = val;
+  }
+
+  function renderStateForm() {
+    let html = '', lastGroup = '';
+    for (const f of allStateFields()) {
+      if (f.group !== lastGroup) {
+        if (lastGroup) html += '</div></div>';
+        html += `<div class="grp"><span class="sub">${f.group}</span><div class="row">`;
+        lastGroup = f.group;
+      }
+      html += `<div class="cell" style="width:150px"><label>${f.label}</label>
+        <input type="number" step="any" data-path="${f.p}" /></div>`;
+    }
+    if (lastGroup) html += '</div></div>';
+    $('state-form').innerHTML = html;
+  }
+
+  function loadExample() {
+    const s = exampleState();
+    for (const f of allStateFields()) {
+      const el = $('state-form').querySelector(`[data-path="${f.p}"]`);
+      const v = getPath(s, f.p);
+      if (el) el.value = (v === undefined ? '' : v);
+    }
+    $('status').textContent = '已载入示例状态，点击「读取表单」。';
+  }
+
+  function collectState() {
+    const s = {};
+    for (const f of allStateFields()) {
+      const el = $('state-form').querySelector(`[data-path="${f.p}"]`);
+      const raw = (el && el.value) || '';
+      const n = Number(raw);
+      const num = raw === '' ? 0 : (Number.isFinite(n) ? (f.num === 'int' ? Math.round(n) : n) : 0);
+      setPath(s, f.p, num);
+    }
+    currentState = s;
+    $('status').textContent = '状态已录入（期初现金 ' + s.cash + ' 元）。';
   }
 
   async function callAPI(path, body) {
@@ -130,8 +232,8 @@
   }
 
   function requireState() {
-    if (!currentState) { parseState(); }
-    if (!currentState) { $('status').textContent = '请先录入并解析状态。'; return null; }
+    if (!currentState) { collectState(); }
+    if (!currentState) { $('status').textContent = '请先录入状态。'; return null; }
     return currentState;
   }
 
@@ -268,6 +370,7 @@
 
   function fmt(n) { return Number(n).toLocaleString('zh-CN', {maximumFractionDigits:0}); }
 
+  renderStateForm();
   loadExample();
 </script>
 </body>
