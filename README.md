@@ -1,8 +1,9 @@
+<p align="center">
+
 # Gungnir
 
 > An AI decision **copilot** for business-war simulation (BizSim) — not an autopilot. The engine guarantees feasibility, the model explains the *why*, and you submit the final decision. The human stays in the loop.
 
-<p align="center">
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.1.0-informational.svg" alt="Version 0.1.0"></a>
