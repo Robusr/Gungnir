@@ -248,6 +248,18 @@ class ProposalResult(BaseModel):
     rationale: list[str] = Field(default_factory=list)
     # True iff the proposal is feasible and never triggers emergency financing.
     feasible: bool = True
+    # The (normalized) period-start state this proposal was generated from.
+    state: GameState | None = None
+
+
+class Explanation(BaseModel):
+    """LLM (L4) explanation of a decision, grounded in engine-computed numbers."""
+
+    text: str  # Chinese explanation
+    citations: list[str] = Field(default_factory=list)  # referenced numeric facts
+    used_llm: bool = False  # False => template fallback (no API / offline)
+    model: str | None = None
+    fallback_reason: str | None = None
 
 
 # Type aliases for readability.
