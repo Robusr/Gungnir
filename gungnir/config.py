@@ -111,18 +111,19 @@ class RawMaterialParams:
 class LaborParams:
     """Wage and headcount rules."""
 
-    # Base hourly wage for the first shift normal class. Confirmed against the
+    # Base hourly wage for the first-shift normal class. Confirmed against the
     # reference tool: 基本工资 = 在岗人数 * 520 * base * 工资系数.
     base_hourly_wage: float = 3.0
-    # Raw hourly-wage table from the parameter sheet: (3, 4.5, 4, 6).
-    # TODO(待确认): exact mapping of the four values to
-    #   {first, second} shift x {A, B} plus overtime rates. The engine's
-    #   特殊班工资 (special-shift wage) formula depends on this and is derived
-    #   in M1 by reconciling against 财务!R16.
-    hourly_wage_first_A: float = 3.0
-    hourly_wage_first_B: float = 4.5
-    hourly_wage_second_A: float = 4.0
-    hourly_wage_second_B: float = 6.0
+    # Shift-based hourly wages. The parameter sheet lists four values
+    # (3, 4.5, 4, 6); our working hypothesis (TODO 待确认) is that they are
+    # shift-based, with overtime = 1.5x its own shift's normal rate:
+    #   first_normal=3, first_overtime=4.5, second_normal=4, second_overtime=6.
+    # The engine's 特殊班工资 formula depends on this mapping and is reconciled
+    # against 财务!R16 in M1.
+    first_normal_wage: float = 3.0
+    first_overtime_wage: float = 4.5
+    second_normal_wage: float = 4.0
+    second_overtime_wage: float = 6.0
     # New-worker training: fee and wage ratio during training.
     new_worker_training_fee: float = 500.0
     new_worker_training_wage_ratio: float = 0.25
