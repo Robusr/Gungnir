@@ -40,12 +40,21 @@ _PID_INDEX = {ProductId.A: 0, ProductId.B: 1}
 _MARKET_INDEX = {MarketId.M1: 0, MarketId.M2: 1, MarketId.M3: 2}
 
 
-def propose(state: GameState, config: Config = CONFIG) -> ProposalResult:
-    """Propose a feasible decision for ``state``."""
+def propose(
+    state: GameState,
+    config: Config = CONFIG,
+    prices: dict[ProductId, dict[MarketId, float]] | None = None,
+) -> ProposalResult:
+    """Propose a feasible decision for ``state``.
+
+    ``prices`` may override the pricing step (used by the M3 optimizer); when
+    omitted, last-period prices (or config defaults) are used.
+    """
     state = _normalize_state(state)
     products = state.products
 
-    prices = _default_prices(state, config)
+    if prices is None:
+        prices = _default_prices(state, config)
     rnd = _rnd_investment(products, config)
     advertising = {pid: 0.0 for pid in ProductId}
     promotion = {m: 0.0 for m in MarketId}
