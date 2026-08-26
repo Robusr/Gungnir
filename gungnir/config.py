@@ -103,6 +103,42 @@ class RawMaterialParams:
 
 
 # ---------------------------------------------------------------------------
+# Demand (L2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DemandParams:
+    """Deterministic demand model used by the proposal (M2) and optimizer (M3).
+
+    The platform's exact demand coefficients are not published, so this model is
+    a *working placeholder* (TODO 待确认). Its role is to give the proposer a
+    monotone, reproducible demand surface to size production/shipments against;
+    feasibility does not depend on its exact values.
+
+    demand[pid][m] = base[pid][m] * (price / ref[pid])**elasticity
+                     * (1 + adv_sens * advertising[pid] / 1000)
+                     * (1 + promo_sens * promotion[m] / 1000)
+                     * grade**grade_sens,  clamped to >= 0.
+    """
+
+    # Per-product per-market base demand (件/期): (A: m1,m2,m3), (B: m1,m2,m3).
+    base_demand: tuple[tuple[float, float, float], tuple[float, float, float]] = (
+        (400.0, 400.0, 400.0),
+        (200.0, 200.0, 200.0),
+    )
+    # Reference price at which base demand is realized (元): (A, B).
+    reference_price: tuple[float, float] = (2500.0, 5000.0)
+    # Own-price elasticity (negative): % demand change per % price change.
+    price_elasticity: float = -1.5
+    # TODO(待确认): advertising / promotion / grade sensitivities (set to 0
+    # until the platform's marketing & grade response is characterized).
+    advertising_sensitivity: float = 0.0
+    promotion_sensitivity: float = 0.0
+    grade_sensitivity: float = 0.0
+
+
+# ---------------------------------------------------------------------------
 # Labor
 # ---------------------------------------------------------------------------
 
@@ -254,6 +290,7 @@ class Config:
         default_factory=lambda: (_product_a(), _product_b())
     )
     raw_material: RawMaterialParams = field(default_factory=RawMaterialParams)
+    demand: DemandParams = field(default_factory=DemandParams)
     labor: LaborParams = field(default_factory=LaborParams)
     machine: MachineParams = field(default_factory=MachineParams)
     finance: FinanceParams = field(default_factory=FinanceParams)
