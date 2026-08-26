@@ -6,7 +6,7 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.1.0-informational.svg" alt="Version 0.1.0"></a>
-  <a href="#测试"><img src="https://img.shields.io/badge/tests-75%20passed-brightgreen.svg" alt="Tests: 75 passed"></a>
+  <a href="#测试"><img src="https://img.shields.io/badge/tests-81%20passed-brightgreen.svg" alt="Tests: 81 passed"></a>
   <a href="#交付路线图"><img src="https://img.shields.io/badge/status-M0%E2%80%93M6%20complete-brightgreen.svg" alt="Status: M0–M6 complete"></a>
 </p>
 
@@ -29,7 +29,7 @@ Gungnir（永恒之枪）面向北大光华企业竞争模拟平台（[edu.ibizs
 | **L0 规则引擎** | 状态机 + 37 行现金流仿真 + 可行性校验 + 七指标评分投影（信任锚） | ✅ |
 | **L1 状态采集** | 结构化录入/解析每期输入，重建完整公司状态 | ✅ |
 | **L2 需求模型** | 参数化需求函数（价格/广告/促销/等级），预留历史标定接口 | ✅ |
-| **L3 优化器** | 约束下确定性搜索，输出可行最优决策 | ✅ |
+| **L3 优化器** | 多期贴现目标 + 坐标上升定价；激活国债/分红/批量折扣长期杠杆 | ✅ |
 | **L4 LLM 层** | 解释「为什么」、管理教学；无密钥时降级为确定性模板 | ✅ |
 | **L5 UI** | 单页界面：录入 → 提案 → 调整 → 导出 | ✅ |
 | **M6 复盘评估** | 多期回放、自博弈、评分曲线 | ✅ |
@@ -109,7 +109,7 @@ Gungnir/
 │       └── scoring.py     #   七指标 Z-score
 ├── docs/
 │   └── rules.md           # 领域规则规格 + 待确认项
-├── tests/                 # 单元测试（75 个）
+├── tests/                 # 单元测试（81 个）
 ├── pyproject.toml         # 依赖与工具配置
 ├── .env.example           # LLM 配置示例
 ├── README.md
@@ -132,14 +132,14 @@ pytest                    # 运行全部测试
 pytest --cov=gungnir      # 含覆盖率（需安装 pytest-cov）
 ```
 
-当前 **75 个测试全部通过**，覆盖：现金流对拍、可行性校验、评分、需求模型、提案/优化、LLM 降级、Web 闭环、多期回放与自博弈。
+当前 **81 个测试全部通过**，覆盖：现金流对拍、可行性校验、评分、需求模型、提案/优化（含批量折扣、国债部署、多期目标）、LLM 降级、Web 闭环、多期回放与自博弈。
 
 ## 交付路线图
 
 - **M0 项目脚手架** ✅ —— repo 结构、依赖、集中 config、README、LICENSE、.gitignore。
 - **M1 引擎核心** ✅ —— `GameState` + `Decision` + 现金流仿真 + 可行性校验 + 评分投影（对拍决策工具.xls）。
 - **M2 决策提案** ✅ —— 给定状态生成一套可行决策（规则/简单搜索，不接 LLM）。
-- **M3 优化器** ✅ —— 确定性坐标上升（定价），输出可行最优方案。
+- **M3 优化器** ✅ —— 确定性坐标上升（定价）＋ 多期贴现目标，激活国债/分红/批量折扣长期杠杆。
 - **M4 LLM 层** ✅ —— 接入 DeepSeek（OpenAI 兼容，端点/模型经 env 注入），解释 + 教学；无密钥降级。
 - **M5 UI** ✅ —— 单页 HTML/JS + FastAPI，跑通「录入 → 提案 → 调整 → 导出」闭环。
 - **M6 复盘/评估** ✅ —— 多期回放、自博弈（N 公司并行）、评分曲线。
