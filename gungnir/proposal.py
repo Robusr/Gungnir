@@ -281,6 +281,34 @@ def _sales_revenue(state: GameState, shipments, prices) -> float:
     return total
 
 
+def evaluate(state: GameState, decision: Decision, config: Config = CONFIG):
+    """Simulate an arbitrary decision, estimating revenue from the L2 demand model.
+
+    This is the re-validation primitive for the M5 "adjust" step: the user edits
+    a decision and the engine re-runs the cash flow with demand-capped revenue
+    (``sold = min(shipped, forecast)``). Returns the engine's ``PeriodResult``,
+    whose ``feasibility`` field tells the user whether the edit is allowed.
+    """
+    state = _normalize_state(state)
+    grade = {pid: max(1.0, state.products[pid].grade) for pid in ProductId}
+    forecast = demand.forecast_demand(
+        state, decision.prices, decision.advertising, decision.promotion, grade, config
+    )
+    revenue = 0.0
+    for pid in ProductId:
+        back = state.products[pid].backorders
+        last = state.last_period_prices.get(pid, {})
+        ref = config.demand.reference_price[_PID_INDEX[pid]]
+        for m in MarketId:
+            shipped = decision.shipments.get(pid, {}).get(m, 0)
+            price = decision.prices.get(pid, {}).get(m, ref)
+            sold = min(float(shipped), forecast[pid][m])
+            b = min(back.get(m, 0), sold)
+            last_price = last.get(m, price)
+            revenue += b * min(last_price, price) + (sold - b) * price
+    return simulate(state, decision, revenue, config)
+
+
 # ---------------------------------------------------------------------------
 # Rationale (Chinese, for L4/L5)
 # ---------------------------------------------------------------------------
