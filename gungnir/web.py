@@ -24,15 +24,18 @@ from pydantic import BaseModel
 from gungnir import llm
 from gungnir.models import (
     Decision,
+    EpisodeResult,
     Explanation,
     GameState,
     MarketId,
     PeriodResult,
     ProductId,
     ProposalResult,
+    TournamentResult,
 )
 from gungnir.optimize import optimize
 from gungnir.proposal import evaluate, propose
+from gungnir.replay import run_episode, run_tournament
 
 _STATIC = Path(__file__).parent / "static"
 
@@ -47,6 +50,16 @@ class StateBody(BaseModel):
 class EvaluateBody(BaseModel):
     state: GameState
     decision: Decision
+
+
+class EpisodeBody(BaseModel):
+    state: GameState
+    periods: int = 8
+
+
+class TournamentBody(BaseModel):
+    states: list[GameState]
+    periods: int = 8
 
 
 @app.get("/")
@@ -79,6 +92,19 @@ def api_explain(body: EvaluateBody) -> Explanation:
         feasible=result.feasibility.feasible,
     )
     return llm.explain(prop)
+
+
+@app.post("/api/episode", response_model=EpisodeResult)
+def api_episode(body: EpisodeBody) -> EpisodeResult:
+    return run_episode(body.state, policy=None, periods=body.periods)
+
+
+@app.post("/api/tournament", response_model=TournamentResult)
+def api_tournament(body: TournamentBody) -> TournamentResult:
+    # Policies cannot be serialized over HTTP, so all firms use the optimizer;
+    # score differences come from differing initial states.
+    policies = [None] * len(body.states)
+    return run_tournament(body.states, policies, body.periods)
 
 
 @app.post("/api/export")
