@@ -4,9 +4,10 @@ import math
 
 import pytest
 
+from gungnir.config import CONFIG
 from gungnir.engine import validate
-from gungnir.models import GameState, MarketId, ProductId, ProductState
-from gungnir.proposal import propose
+from gungnir.models import GameState, MarketId, ProductId, ProductState, ProductionSchedule
+from gungnir.proposal import _raw_material_purchase, propose
 
 
 def _state(**kwargs):
@@ -95,3 +96,42 @@ def test_proposal_fuzz_over_states():
         assert not p.result.feasibility.emergency_loan_triggered
         assert not p.result.feasibility.cash_shortfall
         assert p.result.ending_cash >= 0.0
+
+
+def test_raw_material_purchase_rounds_up_to_discount_tier():
+    # 1500 units of A need 1500 * 300 = 450,000 raw units; purchase = 450k / 0.5
+    # = 900,000 units, just below the 1M tier. The 0.96 tier is worth taking.
+    production = {
+        ProductId.A: ProductionSchedule(first_normal=1500.0),
+        ProductId.B: ProductionSchedule(first_normal=0.0),
+    }
+    state = _state(raw_material_units=0.0)
+    gross = _raw_material_purchase(state, production, CONFIG)
+    assert gross == pytest.approx(1_000_000.0)
+
+
+def test_raw_material_purchase_does_not_overbuy_when_no_tier():
+    # A need far above the top tier (2M) has no higher tier to round up to.
+    production = {
+        ProductId.A: ProductionSchedule(first_normal=20_000.0),
+        ProductId.B: ProductionSchedule(first_normal=0.0),
+    }
+    state = _state(raw_material_units=0.0)
+    # need = 20,000 * 300 = 6,000,000; purchase = 6M / 0.5 = 12M units (> 2M).
+    gross = _raw_material_purchase(state, production, CONFIG)
+    assert gross == pytest.approx(12_000_000.0)
+
+
+def test_proposal_deploys_surplus_to_treasury_and_dividend():
+    p = propose(_state(cash=10_000_000.0))
+    _assert_feasible(p)
+    assert p.decision.treasury_purchase > 0
+    assert p.decision.dividend > 0
+    assert p.result.ending_cash >= CONFIG.finance.minimum_cash
+
+
+def test_proposal_does_not_deploy_when_cash_tight():
+    p = propose(_state(cash=100_000.0))
+    _assert_feasible(p)
+    assert p.decision.treasury_purchase == 0.0
+    assert p.decision.dividend == 0.0
