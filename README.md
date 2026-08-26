@@ -50,6 +50,10 @@ Gungnir/
 │   ├── proposal.py        # M2 决策提案（永远可行）
 │   ├── optimize.py        # M3 优化器（确定性坐标上升）
 │   ├── llm.py             # L4 LLM 层（解释/教学，无密钥时降级为模板）
+│   ├── web.py             # L5 UI 后端（FastAPI，录入→提案→调整→导出）
+│   ├── cli.py             # 启动 web 服务（uvicorn）
+│   ├── static/            # L5 前端（单页 HTML/JS）
+│   │   └── index.html
 │   └── engine/            # L0 规则引擎
 │       ├── production.py  #   排产/资源/成本（纯函数）
 │       ├── validation.py  #   硬约束校验
@@ -86,7 +90,7 @@ pytest
 - **M2 决策提案** ✅ —— 给定状态生成一套可行决策（规则/简单搜索，不接 LLM）。
 - **M3 优化器** ✅ —— 确定性坐标上升（定价），输出可行最优方案。
 - **M4 LLM 层** ✅ —— 接入 DeepSeek V4（OpenAI 兼容，base_url/模型名经 env/.env 注入），解释 + 教学；无密钥时降级为模板。
-- **M5 UI** —— 对话式界面，录入 → 提案 → 现金流/评分 → 调整 → 导出决策单。
+- **M5 UI** ✅ —— 单页 HTML/JS + FastAPI，跑通「录入 → 提案 → 调整 → 导出」闭环。
 - **M6 复盘/评估** —— 历史回放、自博弈、评分曲线。
 
 ## 验收标准（关键）
