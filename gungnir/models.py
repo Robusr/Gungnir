@@ -262,6 +262,41 @@ class Explanation(BaseModel):
     fallback_reason: str | None = None
 
 
+class PeriodRecord(BaseModel):
+    """One simulated period within a multi-period episode (M6)."""
+
+    period: int
+    decision: Decision
+    result: PeriodResult
+    metrics: dict[str, float] = Field(default_factory=dict)
+    composite: float = 0.0  # filled only when peers are available (tournament)
+
+
+class EpisodeResult(BaseModel):
+    """A multi-period rollout of a single firm (M6)."""
+
+    ending_state: GameState
+    records: list[PeriodRecord] = Field(default_factory=list)
+    profit_curve: list[float] = Field(default_factory=list)  # profit per period
+    score_curve: list[float] = Field(default_factory=list)  # composite per period (tournament)
+
+
+class FirmSeries(BaseModel):
+    """One firm's episode inside a tournament."""
+
+    firm_id: str
+    episode: EpisodeResult
+
+
+class TournamentResult(BaseModel):
+    """N-firm self-play with per-period relative Z-scores (M6)."""
+
+    firms: list[FirmSeries] = Field(default_factory=list)
+    periods: int = 0
+    # firm_id -> composite score per period (the "scoring curve").
+    score_curves: dict[str, list[float]] = Field(default_factory=dict)
+
+
 # Type aliases for readability.
 MarketTable = dict[MarketId, float]
 ProductMarketTable = dict[ProductId, dict[MarketId, float]]
