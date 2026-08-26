@@ -88,3 +88,21 @@ def test_export_loop():
     assert "text/csv" in r.headers["content-type"]
     assert "决策" in r.text
     assert "期末现金" in r.text
+
+
+def test_episode_loop():
+    r = client.post("/api/episode", json={"state": _state(), "periods": 4})
+    assert r.status_code == 200, r.text
+    ep = r.json()
+    assert len(ep["records"]) == 4
+    assert len(ep["profit_curve"]) == 4
+    assert ep["ending_state"]["period"] == 4
+
+
+def test_tournament_loop():
+    states = [_state(), _state(), _state()]
+    r = client.post("/api/tournament", json={"states": states, "periods": 3})
+    assert r.status_code == 200, r.text
+    t = r.json()
+    assert len(t["firms"]) == 3
+    assert len(t["score_curves"]["0"]) == 3
