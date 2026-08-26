@@ -98,6 +98,7 @@ def propose(
         scale *= 0.8
 
     assert decision is not None and result is not None
+    result, decision = _deploy_cash(state, decision, config)
     feasible = (
         result.feasibility.feasible
         and not result.feasibility.emergency_loan_triggered
@@ -211,6 +212,15 @@ def _allocate(forecast: dict[MarketId, float], producible: float) -> dict[Market
 
 
 def _raw_material_purchase(state: GameState, production, config: Config) -> float:
+    """Size the raw-material order, rounding up to the next bulk-discount tier
+    when the discount on the whole order outweighs the storage of the excess.
+
+    Rule §6 tiers: [0,1M) 1.00 / [1M,1.5M) 0.96 / [1.5M,2M) 0.92 / ≥2M 0.88.
+    Returns the *gross* yuan outlay at the standard price; the engine credits the
+    discount back via ``_material_discount``. Only the immediate next tier is
+    considered — buying several tiers ahead is a multi-period call left to the
+    optimizer.
+    """
     need = sum(
         production[pid].total * config.product(pid.value).raw_material_units
         for pid in ProductId
@@ -218,8 +228,40 @@ def _raw_material_purchase(state: GameState, production, config: Config) -> floa
     if need <= state.raw_material_units:
         return 0.0
     short = need - state.raw_material_units
-    units = short / config.scenario.raw_material_usable_ratio
-    return math.ceil(units) * config.raw_material.standard_price_per_unit
+    need_units = short / config.scenario.raw_material_usable_ratio
+    base = math.ceil(need_units)
+
+    next_tier: float | None = None
+    for threshold, _ in config.raw_material.bulk_discount_tiers:
+        if threshold > base:
+            next_tier = threshold
+            break
+
+    std_price = config.raw_material.standard_price_per_unit
+    best = base
+    if next_tier is not None and _discount_benefit(next_tier, need_units, config) > _discount_benefit(
+        base, need_units, config
+    ):
+        best = next_tier
+    return best * std_price
+
+
+def _unit_price(units: float, config: Config) -> float:
+    """Unit price for an order of ``units`` (best tier whose threshold is met)."""
+    price = config.raw_material.standard_price_per_unit
+    for threshold, tier_price in config.raw_material.bulk_discount_tiers:
+        if units >= threshold:
+            price = tier_price
+    return price
+
+
+def _discount_benefit(units: float, need_units: float, config: Config) -> float:
+    """Discount income on ``units`` less one period's storage on the excess."""
+    std_price = config.raw_material.standard_price_per_unit
+    discount = units * (std_price - _unit_price(units, config))
+    excess = max(0.0, units - need_units)
+    storage = config.raw_material.storage_cost_rate * excess * std_price
+    return discount - storage
 
 
 def _finance_repair(state: GameState, decision: Decision, config: Config):
@@ -279,6 +321,57 @@ def _sales_revenue(state: GameState, shipments, prices) -> float:
             last_price = last.get(m, price)
             total += b * min(last_price, price) + (shipped - b) * price
     return total
+
+
+def _deploy_cash(state: GameState, decision: Decision, config: Config):
+    """Pay dividends from after-tax profit, then park residual surplus in treasury.
+
+    Sizes follow the cash-flow order 分红 → 买国债 while keeping a cash floor of
+    ``minimum_cash`` plus next period's scheduled debt service:
+
+    * dividend = min(after-tax profit, cash above the floor) — rule §6 upper bound;
+    * treasury = whatever surplus remains above the floor (6% return, rule §6).
+
+    The payout ratio (100% of after-tax profit when affordable) is a *policy*
+    choice, not a platform rule; it is kept conservative by the debt-service floor.
+    """
+    decision = decision.model_copy(deep=True)
+    revenue = _sales_revenue(state, decision.shipments, decision.prices)
+    result = simulate(state, decision, revenue, config)
+
+    if not result.feasibility.feasible or result.feasibility.cash_shortfall:
+        return result, decision
+
+    min_cash = config.finance.minimum_cash
+    available = result.ending_cash  # cash before dividend & treasury (both still 0)
+    after_tax_profit = max(0.0, result.profit - result.tax)
+    floor = min_cash + _next_debt_service(state, decision, config)
+
+    dividend = min(after_tax_profit, max(0.0, available - floor))
+    treasury_purchase = max(0.0, available - dividend - floor)
+
+    if dividend == 0.0 and treasury_purchase == 0.0:
+        return result, decision
+
+    decision.dividend = dividend
+    decision.treasury_purchase = treasury_purchase
+    return simulate(state, decision, revenue, config), decision
+
+
+def _next_debt_service(state: GameState, decision: Decision, config: Config) -> float:
+    """Scheduled debt service due next period: bond principal + interest plus
+    this period's new bank loan. Emergency loans are 0 for feasible proposals."""
+    fin = config.finance
+    q = config.scenario.periods_per_year
+    next_bond_outstanding = max(
+        0.0, state.bond_outstanding + decision.bond_issue - state.bond_principal_due
+    )
+    next_bond_principal = (
+        state.bond_principal_due + decision.bond_issue / fin.bond_repay_periods
+    )
+    bond_service = next_bond_principal + next_bond_outstanding * fin.bond_annual_rate / q
+    bank_service = decision.bank_loan * (1.0 + fin.bank_loan_annual_rate / q)
+    return bond_service + bank_service
 
 
 def evaluate(state: GameState, decision: Decision, config: Config = CONFIG):
