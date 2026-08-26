@@ -16,6 +16,20 @@
 
 Gungnir (named after Odin's spear) is an AI decision copilot for the Peking University Guanghua business-competition simulation platform ([edu.ibizsim.cn](https://edu.ibizsim.cn)), targeting scenario **5A**: 2 products x 3 markets, 10 firms, one period per quarter.
 
+## The loop
+
+Gungnir implements the full decision loop, with a human at every step:
+
+```
+enter state -> propose / optimize -> adjust -> explain -> export
+```
+
+1. **Enter** the period-start state: cash, workers, machines, inventories, loans, and scoring history.
+2. **Propose** a feasible decision, or **optimize** it with a deterministic search.
+3. **Adjust** any field — every edit is instantly re-simulated and re-validated.
+4. **Explain** the decision in Chinese: the LLM narrates the *why*, citing only engine-computed numbers.
+5. **Export** the decision sheet and cash-flow statement as CSV, ready to submit.
+
 ## Core features
 
 | Feature | Description |
@@ -62,7 +76,7 @@ gungnir                 # or: python -m gungnir.cli
 # open http://127.0.0.1:8000
 ```
 
-This runs the full **enter -> propose -> adjust -> export** loop: enter a state JSON -> propose or optimize -> edit the decision with instant re-validation -> export a CSV decision sheet.
+This runs the full **enter -> propose -> adjust -> export** loop: enter a state -> propose or optimize -> edit the decision with instant re-validation -> export a CSV decision sheet.
 
 ### API endpoints
 
@@ -156,6 +170,16 @@ Currently **81 tests pass**, covering: cash-flow reconciliation, feasibility val
 - **M5**: the enter -> propose -> adjust -> export loop runs end to end.
 - **M6**: replay and self-play produce stable, reproducible scoring curves.
 - End to end: an infeasible decision must never appear; a cash-flow break must raise a warning.
+
+## Known open items
+
+A handful of platform parameters are not yet pinned down; they are marked `TODO(待确认)` in [gungnir/config.py](gungnir/config.py), with the full discussion in [docs/rules.md](docs/rules.md):
+
+- The L2 demand model is a working placeholder (the platform does not publish demand coefficients); feasibility never depends on its values.
+- Machine shift capacity (2 x 520 h model), shift-wage mapping, defect rate, and tax-credit semantics.
+- Bond amortization, inventory book-value change, and the scoring lag / NPV adjustments.
+
+Each item is locked down by reconciliation against the reference decision tool (`决策工具.xls`) as data becomes available.
 
 ## License
 
