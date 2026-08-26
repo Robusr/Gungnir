@@ -237,6 +237,19 @@ class PeriodResult(BaseModel):
     score: ScoreBreakdown = Field(default_factory=ScoreBreakdown)
 
 
+class ProposalResult(BaseModel):
+    """A decision proposal (M2) together with its simulated outcome."""
+
+    decision: Decision
+    result: PeriodResult
+    # Forecast demand (件) the proposal was sized against.
+    demand: dict[ProductId, dict[MarketId, float]] = Field(default_factory=dict)
+    # Chinese explanation lines for the LLM layer (L4) and UI (L5).
+    rationale: list[str] = Field(default_factory=list)
+    # True iff the proposal is feasible and never triggers emergency financing.
+    feasible: bool = True
+
+
 # Type aliases for readability.
 MarketTable = dict[MarketId, float]
 ProductMarketTable = dict[ProductId, dict[MarketId, float]]
