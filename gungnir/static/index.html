@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gungnir · 商战模拟 AI 副驾驶</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --fg:#e2e8f0; --muted:#94a3b8;
+            --ok:#34d399; --bad:#f87171; --accent:#38bdf8; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: "PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--fg); }
+    header { padding:16px 24px; border-bottom:1px solid var(--line); }
+    header h1 { margin:0; font-size:20px; }
+    header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+    main { display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:16px 24px; }
+    section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+    section h2 { margin:0 0 12px; font-size:15px; color:var(--accent); }
+    textarea { width:100%; height:220px; background:#0b1220; color:var(--fg); border:1px solid var(--line);
+      border-radius:6px; padding:8px; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+    button { background:var(--accent); color:#06202a; border:0; border-radius:6px; padding:8px 14px;
+      cursor:pointer; font-weight:600; margin:4px 6px 0 0; }
+    button.secondary { background:transparent; color:var(--fg); border:1px solid var(--line); }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+    label { font-size:12px; color:var(--muted); display:block; margin-bottom:2px; }
+    input { width:100%; background:#0b1220; color:var(--fg); border:1px solid var(--line);
+      border-radius:6px; padding:6px 8px; font-size:13px; }
+    .cell { width:80px; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th, td { text-align:right; padding:4px 8px; border-bottom:1px solid var(--line); }
+    th:first-child, td:first-child { text-align:left; }
+    th { color:var(--muted); font-weight:500; }
+    .neg { color:var(--bad); } .pos { color:var(--ok); }
+    .badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; }
+    .badge.ok { background:rgba(52,211,153,.15); color:var(--ok); }
+    .badge.bad { background:rgba(248,113,113,.15); color:var(--bad); }
+    .violation { color:var(--bad); font-size:12px; margin:2px 0; }
+    .expl { white-space:pre-wrap; font-size:13px; line-height:1.6; }
+    #right { display:flex; flex-direction:column; gap:16px; }
+    .muted { color:var(--muted); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Gungnir · 商战模拟 AI 副驾驶</h1>
+  <p>录入 → 提案 → 调整 → 导出　（人类在环，最终决策由你提交）</p>
+</header>
+<main>
+  <section id="left">
+    <h2>① 状态录入</h2>
+    <textarea id="state-json"></textarea>
+    <div class="row">
+      <button onclick="loadExample()" class="secondary">载入示例</button>
+      <button onclick="parseState()">解析状态</button>
+    </div>
+    <h2>② 操作</h2>
+    <div class="row">
+      <button onclick="doPropose()">提案</button>
+      <button onclick="doOptimize()">优化</button>
+      <button onclick="doExplain()">解释</button>
+      <button onclick="doExport()" class="secondary">导出决策单</button>
+    </div>
+    <p id="status" class="muted"></p>
+  </section>
+
+  <div id="right">
+    <section>
+      <h2>③ 决策调整（可编辑，改动后自动重新评估）</h2>
+      <div id="decision-form"></div>
+      <div id="feasibility"></div>
+    </section>
+    <section>
+      <h2>④ 现金流与结果</h2>
+      <div id="summary"></div>
+      <div style="overflow:auto; max-height:360px;"><table id="cashflow"></table></div>
+    </section>
+    <section>
+      <h2>⑤ 解释（为什么）</h2>
+      <div id="explanation" class="expl muted">尚未生成解释。</div>
+    </section>
+  </div>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  function exampleState() {
+    return {
+      period: 0, cash: 2945500, workers: 150, machines: 100,
+      machines_in_transit: 0, machines_ordered: 0, raw_material_units: 1236000,
+      accumulated_depreciation: 1600000, treasury: 0, bank_loan: 0, emergency_loan: 0,
+      bond_outstanding: 550000, bond_principal_due: 20500,
+      cumulative_tax: 67227, cumulative_dividend: 0, tax_credit: -2475,
+      net_assets: 6395930, last_period_profit: -5675, composite_score: 0,
+      products: {
+        A: { factory_inventory: 204, market_inventory: {}, backorders: {}, rnd_level: 1,
+             rnd_cumulative: 100000, rnd_spent_last_period: 0, grade: 1 },
+        B: { factory_inventory: 188, market_inventory: {}, backorders: {}, rnd_level: 1,
+             rnd_cumulative: 200000, rnd_spent_last_period: 0, grade: 1 }
+      },
+      last_period_prices: { A: {M1:2549,M2:2299,M3:2599}, B: {M1:5199,M2:5099,M3:5199} }
+    };
+  }
+
+  let currentState = null;
+  let currentDecision = null;
+  let currentResult = null;
+
+  function loadExample() {
+    $('state-json').value = JSON.stringify(exampleState(), null, 2);
+    $('status').textContent = '已载入示例状态，点击「解析状态」。';
+  }
+
+  function parseState() {
+    try {
+      currentState = JSON.parse($('state-json').value);
+      $('status').textContent = '状态已解析（期初现金 ' + currentState.cash + ' 元）。';
+    } catch (e) {
+      $('status').textContent = 'JSON 解析失败：' + e.message;
+    }
+  }
+
+  async function callAPI(path, body) {
+    const resp = await fetch(path, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) { const t = await resp.text(); throw new Error(path + ' ' + resp.status + ': ' + t); }
+    return resp.json();
+  }
+
+  function requireState() {
+    if (!currentState) { parseState(); }
+    if (!currentState) { $('status').textContent = '请先录入并解析状态。'; return null; }
+    return currentState;
+  }
+
+  async function doPropose() {
+    if (!requireState()) return;
+    $('status').textContent = '提案中…';
+    const p = await callAPI('/api/propose', { state: currentState });
+    applyProposal(p, '提案完成');
+  }
+
+  async function doOptimize() {
+    if (!requireState()) return;
+    $('status').textContent = '优化中…';
+    const p = await callAPI('/api/optimize', { state: currentState });
+    applyProposal(p, '优化完成');
+  }
+
+  function applyProposal(p, msg) {
+    currentDecision = p.decision;
+    currentResult = p.result;
+    renderDecision();
+    renderResult();
+    $('status').textContent = msg + '（可行：' + (p.feasible ? '是' : '否') + '）';
+    $('explanation').textContent = (p.rationale || []).join('\n');
+  }
+
+  async function doExplain() {
+    if (!requireState() || !currentDecision) { $('status').textContent = '请先提案或优化。'; return; }
+    const e = await callAPI('/api/explain', { state: currentState, decision: currentDecision });
+    $('explanation').textContent = (e.used_llm ? '【LLM 解释】\n' : '【模板解释】\n') + e.text;
+  }
+
+  async function doExport() {
+    if (!requireState() || !currentDecision) { $('status').textContent = '请先提案或优化。'; return; }
+    const resp = await fetch('/api/export', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ state: currentState, decision: currentDecision })
+    });
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'gungnir_decision.csv'; a.click();
+  }
+
+  // ---- render decision form -------------------------------------------------
+  const MARKETS = ['M1','M2','M3'];
+  const PRODUCTS = ['A','B'];
+
+  function renderDecision() {
+    const d = currentDecision;
+    const form = $('decision-form');
+    let html = '';
+
+    html += '<div class="row"><label style="width:100%">价格（元）</label>';
+    for (const pid of PRODUCTS) for (const m of MARKETS) {
+      html += `<div class="cell"><label>${pid}/${m}</label>
+        <input type="number" data-field="price" data-pid="${pid}" data-m="${m}" value="${d.prices[pid][m]}" /></div>`;
+    }
+    html += '</div>';
+
+    html += '<div class="row"><label style="width:100%">供货量（件）</label>';
+    for (const pid of PRODUCTS) for (const m of MARKETS) {
+      html += `<div class="cell"><label>${pid}/${m}</label>
+        <input type="number" data-field="ship" data-pid="${pid}" data-m="${m}" value="${d.shipments[pid][m]}" /></div>`;
+    }
+    html += '</div>';
+
+    html += '<div class="row"><label style="width:100%">产量（件，按一班正班计）</label>';
+    for (const pid of PRODUCTS) {
+      html += `<div class="cell"><label>${pid}</label>
+        <input type="number" data-field="prod" data-pid="${pid}" value="${d.production[pid].first_normal}" /></div>`;
+    }
+    html += '</div>';
+
+    html += '<div class="row">';
+    const scalars = [
+      ['hire','招聘（人）'], ['layoff','解聘（人）'], ['machine_purchase','买机器（台）'],
+      ['raw_material_purchase','购原材料（元）'], ['bank_loan','银行贷款（元）'],
+      ['bond_issue','发债券（元）'], ['dividend','分红（元）'], ['wage_coefficient','工资系数']
+    ];
+    for (const [k, label] of scalars) {
+      html += `<div class="cell" style="width:110px"><label>${label}</label>
+        <input type="number" step="any" data-field="${k}" value="${d[k]}" /></div>`;
+    }
+    html += '</div>';
+
+    form.innerHTML = html;
+    form.querySelectorAll('input').forEach(inp => inp.addEventListener('change', onEdit));
+  }
+
+  function onEdit(e) {
+    const inp = e.target;
+    const f = inp.dataset.field;
+    const v = parseFloat(inp.value) || 0;
+    const d = currentDecision;
+    if (f === 'price') d.prices[inp.dataset.pid][inp.dataset.m] = v;
+    else if (f === 'ship') d.shipments[inp.dataset.pid][inp.dataset.m] = Math.round(v);
+    else if (f === 'prod') {
+      const pid = inp.dataset.pid;
+      d.production[pid] = { first_normal: v, first_overtime: 0, second_normal: 0, second_overtime: 0 };
+    } else if (f === 'hire' || f === 'layoff' || f === 'machine_purchase') {
+      d[f] = Math.round(v);
+    } else { d[f] = v; }
+    reEvaluate();
+  }
+
+  async function reEvaluate() {
+    const r = await callAPI('/api/evaluate', { state: currentState, decision: currentDecision });
+    currentResult = r;
+    renderResult();
+  }
+
+  function renderResult() {
+    const r = currentResult;
+    const feas = r.feasibility;
+    const badge = feas.feasible
+      ? '<span class="badge ok">可行</span>'
+      : '<span class="badge bad">不可行</span>';
+    let viol = '';
+    for (const v of (feas.violations || [])) viol += `<div class="violation">• ${v.message}</div>`;
+    $('feasibility').innerHTML = badge + viol;
+
+    $('summary').innerHTML =
+      `销售收入 <b>${fmt(r.revenue_total)}</b> 元　成本 <b>${fmt(Math.abs(r.cost_total))}</b> 元　` +
+      `税前利润 <b>${fmt(r.profit)}</b> 元　纳税 <b>${fmt(r.tax)}</b> 元　期末现金 <b>${fmt(r.ending_cash)}</b> 元`;
+
+    let html = '<tr><th>项目</th><th>金额</th><th>结余</th></tr>';
+    for (const line of r.cash_flow) {
+      if (line.amount === 0 && line.key !== 'opening_cash' && line.key !== 'sales_revenue') continue;
+      const cls = line.amount < 0 ? 'neg' : (line.amount > 0 ? 'pos' : '');
+      html += `<tr><td>${line.label}</td><td class="${cls}">${fmt(line.amount)}</td><td>${fmt(line.cash_after)}</td></tr>`;
+    }
+    $('cashflow').innerHTML = html;
+  }
+
+  function fmt(n) { return Number(n).toLocaleString('zh-CN', {maximumFractionDigits:0}); }
+
+  loadExample();
+</script>
+</body>
+</html>
