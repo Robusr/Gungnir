@@ -1,4 +1,4 @@
-# Gungnir
+<h1 align="center">Gungnir</h1>
 
 > An AI decision **copilot** for business-war simulation (BizSim) — not an autopilot. The engine guarantees feasibility, the model explains the *why*, and you submit the final decision. The human stays in the loop.
 
