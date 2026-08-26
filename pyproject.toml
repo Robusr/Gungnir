@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gungnir"
+version = "0.1.0"
+description = "Gungnir — an AI copilot for business-war simulation (BizSim). Deterministic cash-flow & decision engine + LLM strategy layer."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Gungnir contributors" }]
+keywords = ["bizsim", "simulation", "decision-support", "copilot", "finance"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    # L0/L1 engine — data modelling & validation
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    # L3 optimizer
+    "scipy>=1.11",
+    "numpy>=1.24",
+    # Backend (L5 API)
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    # L4 LLM layer — OpenAI-compatible client (DeepSeek V4 via base_url injection)
+    "openai>=1.30",
+    "httpx>=0.26",
+    # Persistence (M2/M5/M6)
+    "aiosqlite>=0.19",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.3",
+    "mypy>=1.8",
+]
+
+[project.scripts]
+gungnir = "gungnir.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gungnir*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
