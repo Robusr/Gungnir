@@ -1,2 +1,90 @@
-# Gungnir
-Gungnir · An AI copilot for business-war simulation (BizSim). A deterministic cash-flow &amp; decision engine paired with an LLM strategy layer — plan feasible decisions, simulate outcomes, and explain the why behind every move.
+# Gungnir — 商战模拟 AI 副驾驶
+
+> Gungnir（永恒之枪）——企业竞争模拟（BizSim）的 AI 决策副驾驶。
+
+Gungnir 面向北大光华企业竞争模拟平台（edu.ibizsim.cn，2 产品 × 3 市场、10 家公司）。
+定位是 **AI 决策副驾驶，不是自动驾驶**（human-in-the-loop）：
+
+- **L0 规则引擎**保证每张决策单**可行**；
+- **L4 LLM 层**负责解释**为什么**、教管理思维；
+- **用户**提交最终决策到平台。
+
+## 核心原则
+
+1. **引擎是信任锚**：所有数字计算走规则引擎，LLM 绝不直接做算术/现金流计算，只调用引擎结果。
+2. **确定性**：给定输入 → 确定输出，禁止随机性破坏现金流计算。
+3. **永远可行**：任何不可行决策都不允许出现；现金流断裂必须预警。
+4. **人在环**：不自动化网页操作、不追求全自动赢赛、不绕过平台规则。
+
+## 架构（分层）
+
+| 层 | 职责 | 状态 |
+|----|------|------|
+| **L0 规则引擎** | 状态机 + 现金流仿真 + 可行性校验 + 评分投影（信任锚） | M1 |
+| **L1 状态采集** | 结构化录入/解析每期输入，重建完整公司状态 | M2 |
+| **L2 需求模型** | 参数化需求函数（价格/广告/促销/等级 + 相对对手值），预留历史标定接口 | M3 |
+| **L3 优化器** | 约束下搜索可行决策，输出候选方案 | M3 |
+| **L4 LLM 层** | 消息解读、战略选择、对手推断、解释与教学 | M4 |
+| **L5 UI** | 对话式界面，提案/现金流/评分/what-if 面板 | M5 |
+
+## 领域参数（场景 5A）
+
+- 2 产品（A/B）× 3 市场 × 10 公司；1 期 = 1 季度；难度 5A。
+- 初始现金 2,500,000 元；最低现金 2,000,000 元；信用总额 8,000,000 元。
+- 单件资源：A（机器 100h / 人力 150h / 原料 300）；B（机器 200h / 人力 250h / 原料 1500）。
+- 评分：七项指标加权 Z-score（本期利润 .20 / 净资产 .20 / 市场份额 .15 / 资本利润率 .15 /
+  累计分红 .10 / 累计缴税 .10 / 人均利润率 .10）。
+
+完整规则见 [docs/rules.md](docs/rules.md)；所有数值参数集中在 [gungnir/config.py](gungnir/config.py)。
+
+## 目录结构
+
+```
+Gungnir/
+├── gungnir/
+│   ├── __init__.py        # 包元信息
+│   └── config.py          # 集中参数配置（单文件 config，信任锚数据）
+├── docs/
+│   └── rules.md           # 领域规则规格 + 待确认项
+├── tests/                 # 单元测试（M1 起）
+├── pyproject.toml         # 依赖与工具配置
+├── README.md
+└── LICENSE                # MIT
+```
+
+## 快速开始
+
+```bash
+# 1. 创建虚拟环境并安装
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# 2. 冒烟测试（配置模块无依赖，可直接导入）
+python -c "from gungnir.config import CONFIG; print(CONFIG.products[0])"
+
+# 3. 运行测试（M1 起）
+pytest
+```
+
+## 交付路线图
+
+- **M0 项目脚手架** ✅ —— repo 结构、依赖、README、LICENSE、.gitignore、集中 config。
+- **M1 引擎核心** —— `GameState` + `Decision` + 现金流仿真 + 可行性校验 + 评分投影（含单测，对拍决策工具.xls）。
+- **M2 决策提案** —— 给定状态生成一套可行决策（规则/简单搜索，不接 LLM）。
+- **M3 优化器** —— 约束搜索，输出多候选 + 评分对比。
+- **M4 LLM 层** —— 接入 DeepSeek V4（OpenAI 兼容，base_url/模型名经配置注入），解释 + what-if。
+- **M5 UI** —— 对话式界面，录入 → 提案 → 现金流/评分 → 调整 → 导出决策单。
+- **M6 复盘/评估** —— 历史回放、自博弈、评分曲线。
+
+## 验收标准（关键）
+
+- **M1**：同一组输入，现金流与评分和手工「决策工具.xls」一致（对拍）。
+- **M2/M3**：输出决策**永远可行**，且能解释每项选择。
+- **M4**：解释清晰、引用具体数值、不编造规则。
+- **M5**：完整跑通「录入 → 提案 → 调整 → 导出」闭环。
+- 全流程：任何不可行决策都不允许出现；现金流断裂必须预警。
+
+## License
+
+[MIT](LICENSE)
