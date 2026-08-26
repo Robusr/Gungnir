@@ -43,11 +43,23 @@ Gungnir 面向北大光华企业竞争模拟平台（edu.ibizsim.cn，2 产品 �
 Gungnir/
 ├── gungnir/
 │   ├── __init__.py        # 包元信息
-│   └── config.py          # 集中参数配置（单文件 config，信任锚数据）
+│   ├── config.py          # 集中参数配置（单文件 config，信任锚数据）
+│   ├── models.py          # pydantic 领域模型
+│   ├── settings.py        # 运行时设置（env/.env 注入，LLM base_url/model）
+│   ├── demand.py          # L2 需求模型（占位）
+│   ├── proposal.py        # M2 决策提案（永远可行）
+│   ├── optimize.py        # M3 优化器（确定性坐标上升）
+│   ├── llm.py             # L4 LLM 层（解释/教学，无密钥时降级为模板）
+│   └── engine/            # L0 规则引擎
+│       ├── production.py  #   排产/资源/成本（纯函数）
+│       ├── validation.py  #   硬约束校验
+│       ├── cashflow.py    #   37 行有序现金流仿真
+│       └── scoring.py     #   七指标 Z-score
 ├── docs/
 │   └── rules.md           # 领域规则规格 + 待确认项
-├── tests/                 # 单元测试（M1 起）
+├── tests/                 # 单元测试（63 个）
 ├── pyproject.toml         # 依赖与工具配置
+├── .env.example           # LLM 配置示例（base_url / api_key / model）
 ├── README.md
 └── LICENSE                # MIT
 ```
@@ -70,10 +82,10 @@ pytest
 ## 交付路线图
 
 - **M0 项目脚手架** ✅ —— repo 结构、依赖、README、LICENSE、.gitignore、集中 config。
-- **M1 引擎核心** —— `GameState` + `Decision` + 现金流仿真 + 可行性校验 + 评分投影（含单测，对拍决策工具.xls）。
-- **M2 决策提案** —— 给定状态生成一套可行决策（规则/简单搜索，不接 LLM）。
-- **M3 优化器** —— 约束搜索，输出多候选 + 评分对比。
-- **M4 LLM 层** —— 接入 DeepSeek V4（OpenAI 兼容，base_url/模型名经配置注入），解释 + what-if。
+- **M1 引擎核心** ✅ —— `GameState` + `Decision` + 现金流仿真 + 可行性校验 + 评分投影（对拍决策工具.xls）。
+- **M2 决策提案** ✅ —— 给定状态生成一套可行决策（规则/简单搜索，不接 LLM）。
+- **M3 优化器** ✅ —— 确定性坐标上升（定价），输出可行最优方案。
+- **M4 LLM 层** ✅ —— 接入 DeepSeek V4（OpenAI 兼容，base_url/模型名经 env/.env 注入），解释 + 教学；无密钥时降级为模板。
 - **M5 UI** —— 对话式界面，录入 → 提案 → 现金流/评分 → 调整 → 导出决策单。
 - **M6 复盘/评估** —— 历史回放、自博弈、评分曲线。
 
