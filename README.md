@@ -179,8 +179,6 @@ A handful of platform parameters are not yet pinned down; they are marked `TODO(
 - Machine shift capacity (2 x 520 h model), shift-wage mapping, defect rate, and tax-credit semantics.
 - Bond amortization, inventory book-value change, and the scoring lag / NPV adjustments.
 
-Each item is locked down by reconciliation against the reference decision tool (`决策工具.xls`) as data becomes available.
-
 ## License
 
 [MIT](LICENSE) (c) Gungnir contributors
