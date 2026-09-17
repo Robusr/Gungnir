@@ -1,6 +1,6 @@
 <h1 align="center">Gungnir</h1>
 
-> 面向商战模拟（BizSim）的 AI 决策**副驾驶**（copilot），不是自动驾驶（autopilot）。引擎保证可行，模型解释「为什么」，最终决策由你提交。人在环。
+> 面向商战模拟（BizSim）的AI决策**副驾驶**（copilot），不是自动驾驶（autopilot）。引擎保证可行，模型解释「为什么」，最终决策由你提交。人在环。
 
 <p align="center">
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
